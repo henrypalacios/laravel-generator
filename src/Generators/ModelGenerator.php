@@ -126,9 +126,17 @@ class ModelGenerator extends BaseGenerator
             $docsTemplate = get_template('docs.model', 'laravel-generator');
             $docsTemplate = fill_template($this->commandData->dynamicVars, $docsTemplate);
 
-            $fillables = '';
+            $fillables = $oldField = '';
+            $count = 1;
             foreach ($this->commandData->relations as $relation) {
-                $fillables .= ' * @property '.$this->getPHPDocType($relation->type, $relation).PHP_EOL;
+                $field = $relationText = (isset($relation->inputs[1])) ? $relation->inputs[1] : null;
+
+                if ($field == $oldField) {
+                    $relationText = $relationText.'_'.$count;
+                    $count++;
+                }
+                $oldField = $field;
+                $fillables .= ' * @property '.$this->getPHPDocType($relation->type, $relation, $relationText).PHP_EOL;
             }
             foreach ($this->commandData->fields as $field) {
                 if ($field->isFillable) {
@@ -147,27 +155,30 @@ class ModelGenerator extends BaseGenerator
     /**
      * @param $db_type
      * @param GeneratorFieldRelation|null $relation
+     * @param string|null $relationText
      *
      * @return string
      */
-    private function getPHPDocType($db_type, $relation = null)
+    private function getPHPDocType($db_type, $relation = null, $relationText = null)
     {
+        $relationText = (!empty($relationText)) ? $relationText : null;
+
         switch ($db_type) {
             case 'datetime':
                 return 'string|\Carbon\Carbon';
             case '1t1':
                 return '\\'.$this->commandData->config->nsModel.'\\'.$relation->inputs[0].' '.Str::camel($relation->inputs[0]);
             case 'mt1':
-                if (isset($relation->inputs[1])) {
-                    $relationName = str_replace('_id', '', strtolower($relation->inputs[1]));
+                if (isset($relationText)) {
+                    $relationName = str_replace('_id', '', strtolower($relationText));
                 } else {
                     $relationName = $relation->inputs[0];
                 }
 
                 return '\\'.$this->commandData->config->nsModel.'\\'.$relation->inputs[0].' '.Str::camel($relationName);
             case '1tm':
-                if (isset($relation->inputs[1])) {
-                    $relationName = str_replace('_id', '', strtolower($relation->inputs[1]));
+                if (isset($relationText)) {
+                    $relationName = str_replace('_id', '', strtolower($relationText));
                 } else {
                     $relationName = $relation->inputs[0];
                 }
@@ -326,9 +337,18 @@ class ModelGenerator extends BaseGenerator
     {
         $relations = [];
 
+        $count = 1;
+        $oldField = null;
         foreach ($this->commandData->relations as $relation) {
-            $relationText = $relation->getRelationFunctionText();
+            $field =$relationShipText =  (isset($relation->inputs[1])) ? $relation->inputs[1] : null ;
+
+            if ($field == $oldField) {
+                $relationShipText = $relationShipText.'_'.$count;
+                $count++;
+            }
+            $relationText = $relation->getRelationFunctionText($relationShipText);
             if (!empty($relationText)) {
+                $oldField = $field;
                 $relations[] = $relationText;
             }
         }
